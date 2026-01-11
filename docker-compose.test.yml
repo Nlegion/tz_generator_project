@@ -1,0 +1,19 @@
+version: '3.8'
+
+# Docker Compose конфигурация для запуска тестов
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./data/templates:/app/data/templates:ro
+      - ./htmlcov:/app/htmlcov
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTEST_CURRENT_TEST=1
+    command: ["pytest", "tests/", "-v", "--cov=app", "--cov-report=html", "--cov-report=term"]
+    profiles:
+      - test

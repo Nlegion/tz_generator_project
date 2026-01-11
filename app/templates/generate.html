@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <div class="card">
+            <div class="card-header">
+                <h4>Генератор технических заданий</h4>
+            </div>
+            <div class="card-body">
+                <!-- Вкладки -->
+                <ul class="nav nav-tabs mb-3" id="generateTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button" role="tab">
+                            Форма
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat-pane" type="button" role="tab">
+                            Диалог
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="generateTabContent">
+                    <!-- Вкладка формы -->
+                    <div class="tab-pane fade show active" id="form-pane" role="tabpanel">
+                        <form id="generateForm">
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Описание проекта</label>
+                                <textarea class="form-control" id="description" name="description" 
+                                          rows="4" required placeholder="Опишите проект для которого нужно создать ТЗ..."></textarea>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="project_type" class="form-label">Тип проекта</label>
+                                    <select class="form-select" id="project_type" name="project_type">
+                                        <option value="general">Общий</option>
+                                        <option value="web">Веб-приложение</option>
+                                        <option value="mobile">Мобильное приложение</option>
+                                        <option value="desktop">Десктопное ПО</option>
+                                        <option value="api">API/Микросервисы</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="style" class="form-label">Стиль документа</label>
+                                    <select class="form-select" id="style" name="style">
+                                        <option value="formal">Формальный</option>
+                                        <option value="concise">Лаконичный</option>
+                                        <option value="detailed">Подробный</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="use_examples" name="use_examples" checked>
+                                <label class="form-check-label" for="use_examples">Использовать примеры из базы</label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" id="generateBtn">
+                                <span class="spinner-border spinner-border-sm d-none" id="generateSpinner" role="status"></span>
+                                Сгенерировать ТЗ
+                            </button>
+                        </form>
+                        
+                        <div id="resultContainer" class="mt-4"></div>
+                    </div>
+
+                    <!-- Вкладка диалога -->
+                    <div class="tab-pane fade" id="chat-pane" role="tabpanel">
+                        <div class="mb-3">
+                            <div id="chatMessages" class="border rounded p-3 mb-3" style="height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+                                <div class="text-muted text-center">Начните диалог, чтобы уточнить требования к проекту</div>
+                            </div>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="chatInput" placeholder="Введите ваш вопрос...">
+                                <button class="btn btn-primary" type="button" id="sendChatBtn">
+                                    <span class="spinner-border spinner-border-sm d-none" id="chatSpinner" role="status"></span>
+                                    Отправить
+                                </button>
+                            </div>
+                            <button class="btn btn-secondary mt-2" type="button" id="exportToFormBtn" style="display: none;">
+                                Экспортировать в форму
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let conversationId = null;
+let chatContext = {};
+
+// Обработка формы генерации
+document.getElementById('generateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('generateBtn');
+    const spinner = document.getElementById('generateSpinner');
+    const resultContainer = document.getElementById('resultContainer');
+    
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    resultContainer.innerHTML = '<div class="alert alert-info">Генерация ТЗ...</div>';
+
+    try {
+        const formData = {
+            description: document.getElementById('description').value,
+            project_type: document.getElementById('project_type').value,
+            style: document.getElementById('style').value,
+            use_examples: document.getElementById('use_examples').checked
+        };
+
+        const response = await fetch('/api/v1/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Ошибка генерации');
+        }
+
+        const result = await response.json();
+        
+        resultContainer.innerHTML = `
+            <div class="alert alert-success">
+                <h5>ТЗ успешно сгенерировано!</h5>
+                <p><strong>ID задачи:</strong> ${result.task_id}</p>
+                <p><strong>Длина текста:</strong> ${result.text.length} символов</p>
+                <a href="${result.download_url}" class="btn btn-success mt-2">Скачать .docx</a>
+            </div>
+            <div class="mt-3">
+                <h6>Предпросмотр:</h6>
+                <pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto;">${result.text.substring(0, 500)}...</pre>
+            </div>
+        `;
+    } catch (error) {
+        resultContainer.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+
+// Обработка диалога
+function addChatMessage(role, content) {
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `mb-2 ${role === 'user' ? 'text-end' : 'text-start'}`;
+    messageDiv.innerHTML = `
+        <div class="d-inline-block p-2 rounded ${role === 'user' ? 'bg-primary text-white' : 'bg-light'}">
+            <strong>${role === 'user' ? 'Вы' : 'Ассистент'}:</strong> ${content}
+        </div>
+    `;
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+document.getElementById('sendChatBtn').addEventListener('click', async function() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    const btn = document.getElementById('sendChatBtn');
+    const spinner = document.getElementById('chatSpinner');
+    
+    addChatMessage('user', message);
+    input.value = '';
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+
+    try {
+        const response = await fetch('/api/v1/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: message,
+                conversation_id: conversationId,
+                context: chatContext
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Ошибка получения ответа');
+        }
+
+        const result = await response.json();
+        conversationId = result.conversation_id;
+        if (result.context) {
+            chatContext = result.context;
+        }
+
+        addChatMessage('assistant', result.response);
+        document.getElementById('exportToFormBtn').style.display = 'block';
+    } catch (error) {
+        addChatMessage('assistant', `Ошибка: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+
+document.getElementById('chatInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('sendChatBtn').click();
+    }
+});
+
+// Экспорт в форму
+document.getElementById('exportToFormBtn').addEventListener('click', function() {
+    if (chatContext.description) {
+        document.getElementById('description').value = chatContext.description;
+        document.getElementById('form-tab').click();
+    }
+});
+</script>
+{% endblock %}

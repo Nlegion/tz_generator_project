@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TZ Generator</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .spinner-border {
+            display: none;
+        }
+        .loading .spinner-border {
+            display: inline-block;
+        }
+        .result-section {
+            display: none;
+        }
+        .show-result .result-section {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">TZ Generator</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="#generate">Генерация</a>
+                <a class="nav-link" href="#validate">Проверка</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        // Обработка формы генерации
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateForm = document.getElementById('generateForm');
+            if (generateForm) {
+                generateForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const form = e.target;
+                    form.classList.add('loading');
+
+                    htmx.ajax('POST', '/api/v1/generate', {
+                        values: htmx.values(form),
+                        swap: 'innerHTML',
+                        target: '#resultContainer'
+                    }).then(() => {
+                        form.classList.remove('loading');
+                        form.classList.add('show-result');
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

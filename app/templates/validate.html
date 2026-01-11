@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <div class="card">
+            <div class="card-header">
+                <h4>Проверка технического задания</h4>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="validateTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-pane" type="button" role="tab">
+                            Загрузка файла
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-pane" type="button" role="tab">
+                            Ввод текста
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="validateTabContent">
+                    <!-- Вкладка загрузки файла -->
+                    <div class="tab-pane fade show active" id="file-pane" role="tabpanel">
+                        <form id="fileValidateForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="tzFile" class="form-label">Загрузите файл ТЗ (.docx или .txt)</label>
+                                <input type="file" class="form-control" id="tzFile" name="file" accept=".docx,.txt" required>
+                                <small class="form-text text-muted">Максимальный размер: 10 МБ</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="validateFileBtn">
+                                <span class="spinner-border spinner-border-sm d-none" id="fileSpinner" role="status"></span>
+                                Проверить ТЗ
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Вкладка ввода текста -->
+                    <div class="tab-pane fade" id="text-pane" role="tabpanel">
+                        <form id="textValidateForm">
+                            <div class="mb-3">
+                                <label for="tzText" class="form-label">Введите текст ТЗ</label>
+                                <textarea class="form-control" id="tzText" name="text" rows="10" required 
+                                          placeholder="Вставьте текст технического задания..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="validateTextBtn">
+                                <span class="spinner-border spinner-border-sm d-none" id="textSpinner" role="status"></span>
+                                Проверить ТЗ
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="validationResult" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function displayValidationResult(result) {
+    const resultDiv = document.getElementById('validationResult');
+    
+    const scoreClass = result.score >= 70 ? 'success' : result.score >= 50 ? 'warning' : 'danger';
+    const scoreBadge = `<span class="badge bg-${scoreClass}">${result.score}/100</span>`;
+    
+    let issuesHtml = '';
+    if (result.issues && result.issues.length > 0) {
+        issuesHtml = '<h6>Найденные проблемы:</h6><ul class="list-group mb-3">';
+        result.issues.forEach(issue => {
+            const severityClass = issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info';
+            issuesHtml += `
+                <li class="list-group-item">
+                    <span class="badge bg-${severityClass}">${issue.severity}</span>
+                    <strong>${issue.type}:</strong> ${issue.description}
+                </li>
+            `;
+        });
+        issuesHtml += '</ul>';
+    }
+
+    let suggestionsHtml = '';
+    if (result.suggestions && result.suggestions.length > 0) {
+        suggestionsHtml = '<h6>Предложения по улучшению:</h6><ul class="list-group mb-3">';
+        result.suggestions.forEach(suggestion => {
+            suggestionsHtml += `<li class="list-group-item">${suggestion}</li>`;
+        });
+        suggestionsHtml += '</ul>';
+    }
+
+    resultDiv.innerHTML = `
+        <div class="card">
+            <div class="card-header">
+                <h5>Результаты проверки ${scoreBadge}</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-${result.is_valid ? 'success' : 'warning'}">
+                    <strong>${result.is_valid ? 'ТЗ валидно' : 'ТЗ требует доработки'}</strong><br>
+                    ${result.feedback}
+                </div>
+                ${issuesHtml}
+                ${suggestionsHtml}
+            </div>
+        </div>
+    `;
+}
+
+// Обработка загрузки файла
+document.getElementById('fileValidateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('validateFileBtn');
+    const spinner = document.getElementById('fileSpinner');
+    const resultDiv = document.getElementById('validationResult');
+    
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    resultDiv.innerHTML = '<div class="alert alert-info">Проверка ТЗ...</div>';
+
+    try {
+        const formData = new FormData();
+        const fileInput = document.getElementById('tzFile');
+        if (fileInput.files.length > 0) {
+            formData.append('file', fileInput.files[0]);
+        }
+
+        const response = await fetch('/api/v1/validate', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка валидации');
+        }
+
+        const result = await response.json();
+        displayValidationResult(result);
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+
+// Обработка ввода текста
+document.getElementById('textValidateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('validateTextBtn');
+    const spinner = document.getElementById('textSpinner');
+    const resultDiv = document.getElementById('validationResult');
+    
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    resultDiv.innerHTML = '<div class="alert alert-info">Проверка ТЗ...</div>';
+
+    try {
+        const formData = new FormData();
+        formData.append('text', document.getElementById('tzText').value);
+
+        const response = await fetch('/api/v1/validate', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка валидации');
+        }
+
+        const result = await response.json();
+        displayValidationResult(result);
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

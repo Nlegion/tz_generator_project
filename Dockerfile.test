@@ -1,0 +1,49 @@
+# Dockerfile для запуска тестов
+FROM python:3.12-slim
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Настройка рабочей директории
+WORKDIR /app
+
+# Копирование requirements.txt
+COPY requirements.txt .
+
+# Установка зависимостей (без llama-cpp-python для тестов - используем моки)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    python-docx \
+    structlog \
+    rich \
+    pydantic \
+    pydantic-settings \
+    jinja2 \
+    python-multipart \
+    httpx \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    pytest-mock
+
+# Копирование кода приложения
+COPY app/ ./app/
+COPY tests/ ./tests/
+COPY pyproject.toml ./
+COPY data/templates/ ./data/templates/
+
+# Создание необходимых директорий
+RUN mkdir -p ./data/outputs ./data/tz_examples ./data/templates ./logs
+
+# Переменные окружения для тестов
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PYTEST_CURRENT_TEST=1
+
+# Команда запуска тестов
+CMD ["pytest", "tests/", "-v", "--cov=app", "--cov-report=html", "--cov-report=term"]

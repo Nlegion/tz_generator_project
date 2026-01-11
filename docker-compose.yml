@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Сервис для запуска приложения
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/model:/app/data/model:ro
+      - ./data/tz_examples:/app/data/tz_examples
+      - ./data/outputs:/app/data/outputs
+      - ./data/templates:/app/data/templates
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - USE_GPU=${USE_GPU:-true}
+      - AUTO_DETECT_GPU=${AUTO_DETECT_GPU:-true}
+      - GPU_FALLBACK_ENABLED=${GPU_FALLBACK_ENABLED:-true}
+    # GPU опционально - если доступен, будет использован, иначе fallback на CPU
+    # Раскомментируйте секцию deploy для обязательного использования GPU:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  # Сервис для запуска тестов
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./data/templates:/app/data/templates:ro
+      - ./htmlcov:/app/htmlcov
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTEST_CURRENT_TEST=1
+    command: ["pytest", "tests/", "-v", "--cov=app", "--cov-report=html", "--cov-report=term"]
